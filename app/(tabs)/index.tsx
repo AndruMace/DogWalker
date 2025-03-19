@@ -1,74 +1,154 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React from 'react';
+import { StyleSheet, View, Image, ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { WalkControlButton } from '@/components/ui/WalkControlButton';
+import { WalkStatsCard } from '@/components/ui/WalkStatsCard';
+import { useWalk } from '@/contexts/WalkContext';
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { formatDistance, formatDuration } from '@/utils/formatUtils';
 
 export default function HomeScreen() {
+  const router = useRouter();
+  const { walks, isTracking, startWalk } = useWalk();
+
+  // Calculate total stats
+  const totalDistance = walks.reduce((sum, walk) => sum + walk.distance, 0);
+  const totalDuration = walks.reduce((sum, walk) => sum + walk.duration, 0);
+  const totalWalks = walks.length;
+
+  // Handle start walk button press
+  const handleStartWalk = async () => {
+    await startWalk();
+    router.push('/current-walk');
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
+    <ScrollView style={styles.container}>
+      <View style={styles.headerContainer}>
+        <Image 
+          source={require('@/assets/images/dog-walking.png')} 
+          style={styles.headerImage}
+          resizeMode="contain"
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        <ThemedText type="title">Dog Walker</ThemedText>
+        <ThemedText type="subtitle">Track your walks with your furry friend</ThemedText>
+      </View>
+
+      {isTracking ? (
+        <ThemedView style={styles.currentWalkCard}>
+          <ThemedText type="subtitle">Walk in Progress</ThemedText>
+          <ThemedText>You have an active walk. Continue tracking?</ThemedText>
+          <WalkControlButton 
+            type="stop"
+            onPress={() => router.push('/current-walk')}
+            style={styles.continueButton}
+          />
+        </ThemedView>
+      ) : (
+        <WalkControlButton
+          type="start"
+          onPress={handleStartWalk}
+          style={styles.startButton}
+        />
+      )}
+
+      <ThemedText type="subtitle" style={styles.sectionTitle}>Your Walking Stats</ThemedText>
+
+      <View style={styles.statsGrid}>
+        <ThemedView style={styles.statCard}>
+          <IconSymbol name="figure.walk" size={32} color="#34C759" />
+          <ThemedText type="subtitle">{totalWalks}</ThemedText>
+          <ThemedText>Total Walks</ThemedText>
+        </ThemedView>
+
+        <ThemedView style={styles.statCard}>
+          <IconSymbol name="map" size={32} color="#FF9500" />
+          <ThemedText type="subtitle">{formatDistance(totalDistance)}</ThemedText>
+          <ThemedText>Distance</ThemedText>
+        </ThemedView>
+
+        <ThemedView style={styles.statCard}>
+          <IconSymbol name="clock.fill" size={32} color="#007AFF" />
+          <ThemedText type="subtitle">{formatDuration(totalDuration)}</ThemedText>
+          <ThemedText>Duration</ThemedText>
+        </ThemedView>
+      </View>
+
+      <ThemedText type="subtitle" style={styles.sectionTitle}>Recent Activity</ThemedText>
+      
+      {walks.length > 0 ? (
+        walks.slice(-3).reverse().map(walk => (
+          <WalkStatsCard
+            key={walk.id}
+            distance={walk.distance}
+            duration={walk.duration}
+          />
+        ))
+      ) : (
+        <ThemedView style={styles.emptyState}>
+          <IconSymbol name="pawprint" size={48} color="#888" />
+          <ThemedText>No walks yet. Start your first walk today!</ThemedText>
+        </ThemedView>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginTop: 32,
+    marginBottom: 24,
+  },
+  headerImage: {
+    width: 200,
+    height: 160,
+    marginBottom: 16,
+  },
+  startButton: {
+    alignSelf: 'center',
+    paddingHorizontal: 48,
+    marginVertical: 24,
+  },
+  currentWalkCard: {
+    marginVertical: 16,
+    padding: 16,
     alignItems: 'center',
     gap: 8,
+    borderWidth: 2,
+    borderColor: '#FF3B30',
   },
-  stepContainer: {
-    gap: 8,
+  continueButton: {
+    marginTop: 8,
+  },
+  sectionTitle: {
+    marginTop: 24,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    marginHorizontal: 4,
+    gap: 4,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    gap: 8,
   },
 });
