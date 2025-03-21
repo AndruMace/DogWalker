@@ -47,6 +47,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="clock.fill" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="markers"
+        options={{
+          title: 'Markers',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="mappin" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }

@@ -1,24 +1,36 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Dimensions, View, Text } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Region } from 'react-native-maps';
 import { Coordinate } from '@/contexts/WalkContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import CustomPolyline from './CustomPolyline';
+import { Marker as MarkerType } from '@/contexts/MarkerContext';
 
 type WalkMapProps = {
   coordinates: Coordinate[];
+  markers?: MarkerType[];
   followsUserLocation?: boolean;
   showsUserLocation?: boolean;
   zoomEnabled?: boolean;
   scrollEnabled?: boolean;
+  onPress?: (event: { nativeEvent: { coordinate: { latitude: number; longitude: number } } }) => void;
+};
+
+// Emoji map for marker types
+const MARKER_EMOJI = {
+  trashcan: '🗑️',
+  poop: '💩',
+  pee: '💦'
 };
 
 export const WalkMap: React.FC<WalkMapProps> = ({
   coordinates,
+  markers = [],
   followsUserLocation = true,
   showsUserLocation = true,
   zoomEnabled = true,
   scrollEnabled = true,
+  onPress,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -63,7 +75,8 @@ export const WalkMap: React.FC<WalkMapProps> = ({
       scrollEnabled={scrollEnabled}
       zoomEnabled={zoomEnabled}
       mapType="standard"
-      userInterfaceStyle={isDark ? 'dark' : 'light'}>
+      userInterfaceStyle={isDark ? 'dark' : 'light'}
+      onPress={onPress}>
       
       {routeCoordinates.length >= 2 && (
         <CustomPolyline
@@ -83,6 +96,7 @@ export const WalkMap: React.FC<WalkMapProps> = ({
           pinColor="green"
         />
       )}
+      
       {hasDifferentStartAndEnd && (
         <Marker
           coordinate={{
@@ -93,6 +107,22 @@ export const WalkMap: React.FC<WalkMapProps> = ({
           pinColor="red"
         />
       )}
+
+      {/* Display custom markers with emojis */}
+      {markers.map((marker) => (
+        <Marker
+          key={marker.id}
+          coordinate={{
+            latitude: marker.latitude,
+            longitude: marker.longitude,
+          }}
+          title={marker.type.charAt(0).toUpperCase() + marker.type.slice(1)}
+        >
+          <View style={styles.markerContainer}>
+            <Text style={styles.markerEmoji}>{MARKER_EMOJI[marker.type]}</Text>
+          </View>
+        </Marker>
+      ))}
     </MapView>
   );
 };
@@ -103,5 +133,12 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  markerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerEmoji: {
+    fontSize: 30,
   },
 }); 

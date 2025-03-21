@@ -83,6 +83,7 @@ export default function HomeScreen() {
         walks.slice(-3).reverse().map(walk => (
           <WalkStatsCard
             key={walk.id}
+            walkId={walk.id}
             distance={walk.distance}
             duration={walk.duration}
           />

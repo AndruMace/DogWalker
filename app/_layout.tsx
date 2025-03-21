@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 import { useColorScheme } from 'react-native';
 
 import { WalkProvider } from '@/contexts/WalkContext';
+import { MarkerProvider } from '@/contexts/MarkerContext';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -47,13 +48,15 @@ function RootLayoutNav() {
 
   return (
     <WalkProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
+      <MarkerProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </MarkerProvider>
     </WalkProvider>
   );
 }

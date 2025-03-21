@@ -31,7 +31,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   const handleDateChange = (event: any, newDate?: Date) => {
     setIsPickerVisible(Platform.OS === 'ios');
     if (newDate) {
-      const dateString = newDate.toISOString().split('T')[0];
+      const dateString = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}`;
       onDateChange(dateString);
     }
   };

@@ -7,6 +7,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { WalkMap } from '@/components/ui/WalkMap';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useWalk } from '@/contexts/WalkContext';
+import { useMarkers, Marker } from '@/contexts/MarkerContext';
 import { formatDistance, formatDuration, formatDate, formatTime } from '@/utils/formatUtils';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
@@ -14,16 +15,44 @@ import { Colors } from '@/constants/Colors';
 export default function WalkDetailScreen() {
   const { walkId } = useLocalSearchParams();
   const { walks, deleteWalk } = useWalk();
+  const { markers } = useMarkers();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const accentColor = Colors[colorScheme ?? 'light'].tint;
 
   const [walk, setWalk] = useState(walks.find(w => w.id === walkId));
+  const [walkMarkers, setWalkMarkers] = useState<Marker[]>([]);
 
   // Update walk if walks array changes
   useEffect(() => {
     setWalk(walks.find(w => w.id === walkId));
   }, [walks, walkId]);
+
+  // Find markers that are close to the walk path
+  useEffect(() => {
+    if (walk && walk.coordinates.length > 0) {
+      // Find markers near any point in the walk
+      // This is a simple implementation - a production app might use a more sophisticated algorithm
+      const MAX_DISTANCE = 200; // About 656 feet (200 meters)
+      
+      // Helper function to check if a marker is near the walk path
+      const isMarkerNearWalkPath = (marker: Marker) => {
+        return walk.coordinates.some(coord => {
+          // Calculate rough distance (not using the Haversine formula for simplicity)
+          const latDiff = Math.abs(marker.latitude - coord.latitude);
+          const lonDiff = Math.abs(marker.longitude - coord.longitude);
+          // Rough conversion to meters (this is an approximation)
+          const latMeters = latDiff * 111111;
+          const lonMeters = lonDiff * 111111 * Math.cos(coord.latitude * (Math.PI/180));
+          const distance = Math.sqrt(latMeters * latMeters + lonMeters * lonMeters);
+          return distance < MAX_DISTANCE;
+        });
+      };
+      
+      const nearbyMarkers = markers.filter(isMarkerNearWalkPath);
+      setWalkMarkers(nearbyMarkers);
+    }
+  }, [walk, markers]);
 
   // Handle delete walk
   const handleDelete = () => {
@@ -53,7 +82,7 @@ export default function WalkDetailScreen() {
   if (!walk) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Walk Details' }} />
+        <Stack.Screen options={{ title: 'Walk Details', headerBackTitle: 'Back' }} />
         <ThemedView style={styles.notFoundContainer}>
           <IconSymbol name="exclamationmark.triangle" size={64} color="#FF9500" />
           <ThemedText type="subtitle">Walk Not Found</ThemedText>
@@ -68,6 +97,7 @@ export default function WalkDetailScreen() {
       <Stack.Screen 
         options={{
           title: 'Walk Details',
+          headerBackTitle: 'Back',
           headerRight: () => (
             <TouchableOpacity onPress={handleDelete} style={styles.deleteIcon}>
               <IconSymbol
@@ -82,6 +112,7 @@ export default function WalkDetailScreen() {
       <ScrollView style={styles.container}>
         <WalkMap
           coordinates={walk.coordinates}
+          markers={walkMarkers}
           followsUserLocation={false}
           showsUserLocation={false}
           zoomEnabled={true}

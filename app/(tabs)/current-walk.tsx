@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, SafeAreaView, Platform, StatusBar, BackHandler, Dimensions } from 'react-native';
+import { StyleSheet, View, SafeAreaView, Platform, StatusBar, BackHandler, Dimensions, Alert, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 
@@ -9,7 +9,9 @@ import { WalkMap } from '@/components/ui/WalkMap';
 import { WalkStatsCard } from '@/components/ui/WalkStatsCard';
 import { WalkControlButton } from '@/components/ui/WalkControlButton';
 import { useWalk } from '@/contexts/WalkContext';
+import { useMarkers, MarkerType } from '@/contexts/MarkerContext';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { MarkerControls } from '@/components/ui/MarkerControls';
 
 // Get screen dimensions
 const { height: screenHeight } = Dimensions.get('window');
@@ -17,8 +19,11 @@ const { height: screenHeight } = Dimensions.get('window');
 export default function CurrentWalkScreen() {
   const router = useRouter();
   const { currentWalk, isTracking, startWalk, stopWalk } = useWalk();
+  const { markers, addMarker } = useMarkers();
   const [isLoading, setIsLoading] = useState(false);
   const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
+  const [selectedMarkerType, setSelectedMarkerType] = useState<MarkerType | null>(null);
+  const [showMarkerControls, setShowMarkerControls] = useState(false);
 
   // Check if we need to request permission
   useEffect(() => {
@@ -71,6 +76,49 @@ export default function CurrentWalkScreen() {
     }
   };
 
+  const handleSelectMarkerType = (type: MarkerType) => {
+    if (selectedMarkerType === type) {
+      // If the same type is selected, deselect it
+      setSelectedMarkerType(null);
+    } else {
+      // Otherwise select the new type
+      setSelectedMarkerType(type);
+      // Hide the marker controls panel
+      setShowMarkerControls(false);
+      Alert.alert(
+        'Add Marker',
+        `Tap on the map to place a ${type} marker.`,
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const handleMapPress = (event: any) => {
+    if (selectedMarkerType && isTracking) {
+      const { latitude, longitude } = event.nativeEvent.coordinate;
+      
+      addMarker({
+        type: selectedMarkerType,
+        latitude,
+        longitude,
+      });
+      
+      // Reset the selection after adding
+      setSelectedMarkerType(null);
+      
+      Alert.alert(
+        'Marker Added',
+        `Successfully added a ${selectedMarkerType} marker.`,
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const toggleMarkerControls = () => {
+    setShowMarkerControls(!showMarkerControls);
+    setSelectedMarkerType(null);
+  };
+
   // If we don't have location permission, show a message
   if (locationPermissionDenied) {
     return (
@@ -106,11 +154,34 @@ export default function CurrentWalkScreen() {
 
           <View style={styles.mapContainer}>
             {currentWalk.coordinates && currentWalk.coordinates.length > 0 ? (
-              <WalkMap
-                coordinates={currentWalk.coordinates}
-                followsUserLocation={true}
-                showsUserLocation={true}
-              />
+              <>
+                <WalkMap
+                  coordinates={currentWalk.coordinates}
+                  markers={markers}
+                  followsUserLocation={true}
+                  showsUserLocation={true}
+                  onPress={handleMapPress}
+                />
+                
+                {/* Marker button */}
+                <TouchableOpacity
+                  style={[
+                    styles.markerToggleButton,
+                    showMarkerControls && styles.markerToggleButtonActive
+                  ]}
+                  onPress={toggleMarkerControls}
+                >
+                  <IconSymbol name="mappin.circle.fill" size={24} color="white" />
+                </TouchableOpacity>
+                
+                {/* Marker controls */}
+                {showMarkerControls && (
+                  <MarkerControls
+                    selectedMarkerType={selectedMarkerType}
+                    onSelectMarker={handleSelectMarkerType}
+                  />
+                )}
+              </>
             ) : (
               <ThemedView style={styles.acquiringLocationContainer}>
                 <ThemedText>Acquiring location...</ThemedText>
@@ -205,5 +276,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  markerToggleButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: '#000',
+    borderRadius: 12,
+    padding: 4,
+  },
+  markerToggleButtonActive: {
+    backgroundColor: '#34C759',
   },
 }); 

@@ -7,7 +7,6 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { WalkCard } from '@/components/ui/WalkCard';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useWalk } from '@/contexts/WalkContext';
-import { WalkHistoryItem } from '@/components/ui/WalkHistoryItem';
 
 export default function HistoryScreen() {
   const { walks, getWalksByDate } = useWalk();
@@ -16,28 +15,35 @@ export default function HistoryScreen() {
   // Get all unique dates from walks
   const uniqueDates = [...new Set(walks.map(walk => walk.date))];
   
+  // Get today's date in YYYY-MM-DD format
+  const now = new Date();
+  const todayFormatted = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  
+  // Add today's date to available dates if not already included
+  if (!uniqueDates.includes(todayFormatted)) {
+    uniqueDates.push(todayFormatted);
+  }
+  
   // Sort dates in descending order (newest first)
   uniqueDates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
   
-  // Default to today or the most recent date if no walks today
-  const defaultDate = walks.length > 0 ? uniqueDates[0] : new Date().toISOString().split('T')[0];
-  
-  const [selectedDate, setSelectedDate] = useState(defaultDate);
-  const [walksForDate, setWalksForDate] = useState(getWalksByDate(selectedDate));
+  // Always default to today's date
+  const [selectedDate, setSelectedDate] = useState(todayFormatted);
+  const [walksForDate, setWalksForDate] = useState(getWalksByDate(todayFormatted));
   
   // Update walks when selected date changes
   useEffect(() => {
-    setWalksForDate(getWalksByDate(selectedDate));
+    const walksForSelectedDate = getWalksByDate(selectedDate);
+    // Sort walks for the selected date in reverse chronological order (newest first)
+    const sortedWalksForDate = [...walksForSelectedDate].sort(
+      (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+    );
+    setWalksForDate(sortedWalksForDate);
   }, [selectedDate, getWalksByDate, walks]);
   
   const handleDateChange = (date: string) => {
     setSelectedDate(date);
   };
-
-  // Sort walks by date (newest first)
-  const sortedWalks = [...walks].sort(
-    (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-  );
 
   // Group walks by date
 

@@ -106,7 +106,7 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const now = new Date();
       const newWalk: Walk = {
         id: now.getTime().toString(),
-        date: now.toISOString().split('T')[0],
+        date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
         startTime: now.toISOString(),
         endTime: '',
         duration: 0,

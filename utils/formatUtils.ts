@@ -11,10 +11,16 @@ export function formatDuration(seconds: number): string {
   return `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
 }
 
-// Format distance in meters to km with 2 decimal places
+// Format distance in meters to miles with 2 decimal places
 export function formatDistance(meters: number): string {
-  const kilometers = meters / 1000;
-  return `${kilometers.toFixed(2)} km`;
+  const miles = meters / 1609.344; // Convert meters to miles
+  if (meters < 1609.344) {
+    // If less than a mile, show in feet (1 meter = 3.28084 feet)
+    const feet = meters * 3.28084;
+    return `${feet.toFixed(0)} ft`;
+  } else {
+    return `${miles.toFixed(2)} mi`;
+  }
 }
 
 // Format date string (YYYY-MM-DD) to a more readable format
