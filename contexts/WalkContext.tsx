@@ -92,76 +92,123 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Permission to access location was denied');
     }
 
-    // Get current location before starting tracking
+    // Create a new walk with a placeholder location first, so the UI can update immediately
+    const now = new Date();
+    const initialWalk: Walk = {
+      id: now.getTime().toString(),
+      date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
+      startTime: now.toISOString(),
+      endTime: '',
+      duration: 0,
+      distance: 0,
+      coordinates: [],
+    };
+
+    // Update the state immediately to show we're tracking
+    setCurrentWalk(initialWalk);
+    setIsTracking(true);
+
     try {
-      const initialLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-
-      if (!initialLocation || !initialLocation.coords) {
-        throw new Error('Could not get current location');
-      }
-
-      // Create a new walk with initial location
-      const now = new Date();
-      const newWalk: Walk = {
-        id: now.getTime().toString(),
-        date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
-        startTime: now.toISOString(),
-        endTime: '',
-        duration: 0,
-        distance: 0,
-        coordinates: [{
-          latitude: initialLocation.coords.latitude,
-          longitude: initialLocation.coords.longitude,
-          timestamp: initialLocation.timestamp,
-        }],
-      };
-
-      setCurrentWalk(newWalk);
-      setIsTracking(true);
-
-      // Start location updates
-      const subscription = await Location.watchPositionAsync(
+      // Start a location subscription immediately with balanced accuracy
+      // This is just to show the user's location on the map while we wait for more accurate location
+      const initialSubscription = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.High,
-          distanceInterval: 5, // update every 5 meters
-          timeInterval: 2500, // or at least every 2.5 seconds
+          accuracy: Location.Accuracy.Balanced,
+          distanceInterval: 0, // Get all updates
+          timeInterval: 1000,  // Every second
         },
         (location) => {
+          // Only update the map with this location if we don't have any coordinates yet
           setCurrentWalk((prevWalk) => {
-            if (!prevWalk) return null;
-
-            const newCoordinate: Coordinate = {
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-              timestamp: location.timestamp,
-            };
-
-            const updatedCoordinates = [...prevWalk.coordinates, newCoordinate];
-            let distance = prevWalk.distance;
-
-            // Calculate distance if we have at least 2 coordinates
-            if (updatedCoordinates.length > 1) {
-              const prevCoord = updatedCoordinates[updatedCoordinates.length - 2];
-              distance += calculateDistance(prevCoord, newCoordinate);
-            }
-
-            const now = new Date();
-            const startTime = new Date(prevWalk.startTime);
-            const duration = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-
+            if (!prevWalk || prevWalk.coordinates.length > 0) return prevWalk;
+            
+            // Don't calculate distance for this initial coordinate
+            // Just show user location on map until we get high accuracy
             return {
               ...prevWalk,
-              coordinates: updatedCoordinates,
-              distance,
-              duration,
+              coordinates: [{
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+                timestamp: location.timestamp,
+              }],
             };
           });
         }
       );
 
-      setLocationSubscription(subscription);
+      // Simultaneously, try to get a high accuracy fix
+      // This won't block the UI but will give us a better starting point when available
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+        // maximumAge: 0, // Want a fresh location
+      }).then((preciseLocation) => {
+        // Once we have precise location, remove initial subscription
+        initialSubscription.remove();
+        
+        // Add the precise location as the first real tracking point
+        setCurrentWalk((prevWalk) => {
+          if (!prevWalk) return null;
+          
+          const preciseCoordinate: Coordinate = {
+            latitude: preciseLocation.coords.latitude,
+            longitude: preciseLocation.coords.longitude,
+            timestamp: preciseLocation.timestamp,
+          };
+          
+          return {
+            ...prevWalk,
+            // Replace any existing coordinates with just this precise one
+            coordinates: [preciseCoordinate],
+          };
+        });
+        
+        // Now start the regular high accuracy tracking
+        Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            distanceInterval: 5, // update every 5 meters
+            timeInterval: 2500, // update every 2.5 seconds
+          },
+          (location) => {
+            setCurrentWalk((prevWalk) => {
+              if (!prevWalk) return null;
+
+              const newCoordinate: Coordinate = {
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+                timestamp: location.timestamp,
+              };
+
+              const updatedCoordinates = [...prevWalk.coordinates, newCoordinate];
+              let distance = prevWalk.distance;
+
+              // Calculate distance if we have at least 2 coordinates
+              if (updatedCoordinates.length > 1) {
+                const prevCoord = updatedCoordinates[updatedCoordinates.length - 2];
+                distance += calculateDistance(prevCoord, newCoordinate);
+              }
+
+              const now = new Date();
+              const startTime = new Date(prevWalk.startTime);
+              const duration = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+
+              return {
+                ...prevWalk,
+                coordinates: updatedCoordinates,
+                distance,
+                duration,
+              };
+            });
+          }
+        ).then(subscription => {
+          setLocationSubscription(subscription);
+        });
+      }).catch(error => {
+        console.warn('Failed to get high accuracy location:', error);
+        // Keep using the initial subscription if high accuracy fails
+        setLocationSubscription(initialSubscription);
+      });
+      
     } catch (error) {
       console.error('Error starting walk:', error);
       throw error; // Re-throw the error to be handled by the component

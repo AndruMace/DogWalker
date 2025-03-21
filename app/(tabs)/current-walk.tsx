@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, SafeAreaView, Platform, StatusBar, BackHandler, Dimensions, Alert, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, SafeAreaView, Platform, StatusBar, BackHandler, Dimensions, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 
@@ -56,10 +56,11 @@ export default function CurrentWalkScreen() {
     setIsLoading(true);
     try {
       await startWalk();
+      // No need to wait for permission checks and location to start - it will be handled automatically
+      setIsLoading(false);
     } catch (error) {
       console.error('Error starting walk:', error);
       setLocationPermissionDenied(true);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -184,7 +185,11 @@ export default function CurrentWalkScreen() {
               </>
             ) : (
               <ThemedView style={styles.acquiringLocationContainer}>
-                <ThemedText>Acquiring location...</ThemedText>
+                <ActivityIndicator size="large" color="#34C759" />
+                <ThemedText style={styles.acquiringText}>Acquiring precise location...</ThemedText>
+                <ThemedText style={styles.acquiringSubtext}>
+                  Getting an accurate location fix for the start of your walk. This helps ensure accurate distance tracking.
+                </ThemedText>
               </ThemedView>
             )}
           </View>
@@ -276,6 +281,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
+    gap: 8,
+  },
+  acquiringText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 12,
+  },
+  acquiringSubtext: {
+    textAlign: 'center',
+    opacity: 0.8,
+    marginTop: 4,
   },
   markerToggleButton: {
     position: 'absolute',
