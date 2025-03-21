@@ -1,6 +1,5 @@
 import React, { memo } from 'react';
-import { View, StyleSheet } from 'react-native';
-import MapView, { Polyline } from 'react-native-maps';
+import { Polyline } from 'react-native-maps';
 
 type Coordinate = {
   latitude: number;
@@ -23,24 +22,13 @@ const CustomPolyline: React.FC<CustomPolylineProps> = ({
     return null;
   }
 
+  // With Apple Maps, we can use a single Polyline for the entire path
   return (
-    <>
-      {coordinates.map((coord, index) => {
-        // Skip the first coordinate as we need pairs
-        if (index === 0) return null;
-        
-        const prevCoord = coordinates[index - 1];
-        
-        return (
-          <Polyline
-            key={`line-${index}`}
-            coordinates={[prevCoord, coord]}
-            strokeColor={strokeColor}
-            strokeWidth={strokeWidth}
-          />
-        );
-      })}
-    </>
+    <Polyline
+      coordinates={coordinates}
+      strokeColor={strokeColor}
+      strokeWidth={strokeWidth}
+    />
   );
 };
 

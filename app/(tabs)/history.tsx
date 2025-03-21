@@ -7,9 +7,11 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { WalkCard } from '@/components/ui/WalkCard';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useWalk } from '@/contexts/WalkContext';
+import { WalkHistoryItem } from '@/components/ui/WalkHistoryItem';
 
 export default function HistoryScreen() {
   const { walks, getWalksByDate } = useWalk();
+  const [refreshKey, setRefreshKey] = useState(0);
   
   // Get all unique dates from walks
   const uniqueDates = [...new Set(walks.map(walk => walk.date))];
@@ -31,6 +33,13 @@ export default function HistoryScreen() {
   const handleDateChange = (date: string) => {
     setSelectedDate(date);
   };
+
+  // Sort walks by date (newest first)
+  const sortedWalks = [...walks].sort(
+    (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+  );
+
+  // Group walks by date
 
   return (
     <SafeAreaView style={styles.container}>

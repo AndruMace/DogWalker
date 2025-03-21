@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, SafeAreaView, Platform, StatusBar, BackHandler } from 'react-native';
+import { StyleSheet, View, SafeAreaView, Platform, StatusBar, BackHandler, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 
@@ -10,6 +10,9 @@ import { WalkStatsCard } from '@/components/ui/WalkStatsCard';
 import { WalkControlButton } from '@/components/ui/WalkControlButton';
 import { useWalk } from '@/contexts/WalkContext';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+
+// Get screen dimensions
+const { height: screenHeight } = Dimensions.get('window');
 
 export default function CurrentWalkScreen() {
   const router = useRouter();
@@ -91,7 +94,7 @@ export default function CurrentWalkScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {isTracking && currentWalk ? (
-        <>
+        <View style={styles.activeWalkContainer}>
           <ThemedView style={styles.headerContainer}>
             <ThemedText type="title">Current Walk</ThemedText>
             <WalkStatsCard
@@ -122,7 +125,7 @@ export default function CurrentWalkScreen() {
               isLoading={isLoading}
             />
           </View>
-        </>
+        </View>
       ) : (
         <ThemedView style={styles.emptyStateContainer}>
           <IconSymbol name="figure.walk" size={64} color="#34C759" />
@@ -147,16 +150,26 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
+  activeWalkContainer: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+  },
   headerContainer: {
     padding: 16,
     gap: 16,
   },
   mapContainer: {
     flex: 1,
+    maxHeight: screenHeight * 0.5, // Limit map height to 50% of screen
+    marginBottom: 8,
   },
   buttonContainer: {
     padding: 16,
     alignItems: 'center',
+    marginTop: 'auto',
+    marginBottom: 8,
   },
   emptyStateContainer: {
     flex: 1,

@@ -35,6 +35,7 @@ export const WalkControlButton: React.FC<WalkControlButtonProps> = ({
       onPress={onPress}
       disabled={isLoading}
       activeOpacity={0.8}
+      testID={`walk-control-button-${type}`}
     >
       {isLoading ? (
         <ActivityIndicator color="white" size="small" />
@@ -59,11 +60,12 @@ export const WalkControlButton: React.FC<WalkControlButtonProps> = ({
 const styles = StyleSheet.create({
   button: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 25,
+    marginBottom: 32,
     gap: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },

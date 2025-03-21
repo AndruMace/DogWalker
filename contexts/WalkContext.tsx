@@ -69,23 +69,23 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [walks]);
 
   // Calculate distance between two coordinates in meters using Haversine formula
-  const calculateDistance = (coord1: Coordinate, coord2: Coordinate): number => {
-    const R = 6371e3; // Earth's radius in meters
-    const φ1 = (coord1.latitude * Math.PI) / 180;
-    const φ2 = (coord2.latitude * Math.PI) / 180;
-    const Δφ = ((coord2.latitude - coord1.latitude) * Math.PI) / 180;
-    const Δλ = ((coord2.longitude - coord1.longitude) * Math.PI) / 180;
+  function calculateDistance(coord1: Coordinate, coord2: Coordinate): number {
+    const earthRadius = 6371e3; // Earth's radius in meters
+    const lat1Rad = (coord1.latitude * Math.PI) / 180;
+    const lat2Rad = (coord2.latitude * Math.PI) / 180;
+    const latDiffRad = ((coord2.latitude - coord1.latitude) * Math.PI) / 180;
+    const lonDiffRad = ((coord2.longitude - coord1.longitude) * Math.PI) / 180;
 
-    const a =
-      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const haversineA =
+      Math.sin(latDiffRad / 2) * Math.sin(latDiffRad / 2) +
+      Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(lonDiffRad / 2) * Math.sin(lonDiffRad / 2);
+    const haversineC = 2 * Math.atan2(Math.sqrt(haversineA), Math.sqrt(1 - haversineA));
 
-    return R * c;
-  };
+    return earthRadius * haversineC;
+  }
 
   // Start tracking a new walk
-  const startWalk = async () => {
+  async function startWalk() {
     // Request location permissions
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
@@ -126,7 +126,7 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
         {
           accuracy: Location.Accuracy.High,
           distanceInterval: 5, // update every 5 meters
-          timeInterval: 5000, // or at least every 5 seconds
+          timeInterval: 2500, // or at least every 2.5 seconds
         },
         (location) => {
           setCurrentWalk((prevWalk) => {
@@ -166,10 +166,10 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error starting walk:', error);
       throw error; // Re-throw the error to be handled by the component
     }
-  };
+  }
 
   // Stop tracking the current walk
-  const stopWalk = async () => {
+  async function stopWalk() {
     if (locationSubscription) {
       locationSubscription.remove();
       setLocationSubscription(null);
@@ -186,17 +186,17 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentWalk(null);
       setIsTracking(false);
     }
-  };
+  }
 
   // Delete a walk by ID
-  const deleteWalk = async (id: string) => {
+  async function deleteWalk(id: string) {
     setWalks((prevWalks) => prevWalks.filter((walk) => walk.id !== id));
-  };
+  }
 
   // Get walks for a specific date
-  const getWalksByDate = (date: string): Walk[] => {
+  function getWalksByDate(date: string): Walk[] {
     return walks.filter((walk) => walk.date === date);
-  };
+  }
 
   return (
     <WalkContext.Provider
@@ -215,10 +215,10 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 // Custom hook to use the walk context
-export const useWalk = () => {
+export function useWalk() {
   const context = useContext(WalkContext);
   if (context === undefined) {
     throw new Error('useWalk must be used within a WalkProvider');
   }
   return context;
-}; 
+} 

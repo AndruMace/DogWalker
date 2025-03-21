@@ -1,0 +1,5 @@
+appId: com.anonymous.DogWalker
+---
+- launchApp
+- tapOn:
+    id: "walk-control-button-start"
