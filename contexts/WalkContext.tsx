@@ -1,6 +1,11 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
+import { Platform } from 'react-native';
+
+// Define a background task name
+const BACKGROUND_LOCATION_TASK = 'background-location-task';
 
 // Define types for our walk data
 export type Coordinate = {
@@ -31,6 +36,81 @@ type WalkContextType = {
 
 const WalkContext = createContext<WalkContextType | undefined>(undefined);
 
+// Register the background task outside of component
+TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }: TaskManager.TaskManagerTaskBody) => {
+  if (error) {
+    console.error('Error in background location task:', error);
+    return;
+  }
+  if (data) {
+    // Get the location data
+    const { locations } = data as { locations: Location.LocationObject[] };
+    if (locations && locations.length > 0) {
+      // Get the last location
+      const location = locations[locations.length - 1];
+      
+      try {
+        // Get the current walk from storage
+        const walkData = await AsyncStorage.getItem('currentWalk');
+        if (!walkData) return;
+        
+        const currentWalk: Walk = JSON.parse(walkData);
+        
+        // Create a new coordinate
+        const newCoordinate: Coordinate = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          timestamp: location.timestamp,
+        };
+        
+        // Update walk with new coordinate
+        const updatedCoordinates = [...currentWalk.coordinates, newCoordinate];
+        let distance = currentWalk.distance;
+        
+        // Calculate distance if we have at least 2 coordinates
+        if (updatedCoordinates.length > 1) {
+          const prevCoord = updatedCoordinates[updatedCoordinates.length - 2];
+          const newDistance = calculateDistance(prevCoord, newCoordinate);
+          distance += newDistance;
+        }
+        
+        const now = new Date();
+        const startTime = new Date(currentWalk.startTime);
+        const duration = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+        
+        // Create updated walk
+        const updatedWalk: Walk = {
+          ...currentWalk,
+          coordinates: updatedCoordinates,
+          distance,
+          duration,
+        };
+        
+        // Save updated walk back to AsyncStorage
+        await AsyncStorage.setItem('currentWalk', JSON.stringify(updatedWalk));
+      } catch (error) {
+        console.error('Error processing background location:', error);
+      }
+    }
+  }
+});
+
+// Calculate distance between two coordinates in meters using Haversine formula
+function calculateDistance(coord1: Coordinate, coord2: Coordinate): number {
+  const earthRadius = 6371e3; // Earth's radius in meters
+  const lat1Rad = (coord1.latitude * Math.PI) / 180;
+  const lat2Rad = (coord2.latitude * Math.PI) / 180;
+  const latDiffRad = ((coord2.latitude - coord1.latitude) * Math.PI) / 180;
+  const lonDiffRad = ((coord2.longitude - coord1.longitude) * Math.PI) / 180;
+
+  const haversineA =
+    Math.sin(latDiffRad / 2) * Math.sin(latDiffRad / 2) +
+    Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(lonDiffRad / 2) * Math.sin(lonDiffRad / 2);
+  const haversineC = 2 * Math.atan2(Math.sqrt(haversineA), Math.sqrt(1 - haversineA));
+
+  return earthRadius * haversineC;
+}
+
 export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [walks, setWalks] = useState<Walk[]>([]);
   const [currentWalk, setCurrentWalk] = useState<Walk | null>(null);
@@ -45,12 +125,31 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (walksData) {
           setWalks(JSON.parse(walksData));
         }
+        
+        // Check if there's an active walk in progress
+        const currentWalkData = await AsyncStorage.getItem('currentWalk');
+        if (currentWalkData) {
+          const savedCurrentWalk = JSON.parse(currentWalkData);
+          setCurrentWalk(savedCurrentWalk);
+          setIsTracking(true);
+          
+          // Resume location tracking
+          startBackgroundLocationTracking();
+        }
       } catch (error) {
         console.error('Error loading walks:', error);
       }
     };
 
     loadWalks();
+    
+    // Cleanup on unmount
+    return () => {
+      if (isTracking) {
+        Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
+          .catch(error => console.warn('Failed to stop location updates:', error));
+      }
+    };
   }, []);
 
   // Save walks to AsyncStorage whenever they change
@@ -67,171 +166,157 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
       saveWalks();
     }
   }, [walks]);
+  
+  // Save current walk to AsyncStorage whenever it changes
+  useEffect(() => {
+    const saveCurrentWalk = async () => {
+      if (currentWalk) {
+        try {
+          await AsyncStorage.setItem('currentWalk', JSON.stringify(currentWalk));
+        } catch (error) {
+          console.error('Error saving current walk:', error);
+        }
+      } else {
+        try {
+          await AsyncStorage.removeItem('currentWalk');
+        } catch (error) {
+          console.error('Error removing current walk:', error);
+        }
+      }
+    };
+    
+    saveCurrentWalk();
+  }, [currentWalk]);
 
-  // Calculate distance between two coordinates in meters using Haversine formula
-  function calculateDistance(coord1: Coordinate, coord2: Coordinate): number {
-    const earthRadius = 6371e3; // Earth's radius in meters
-    const lat1Rad = (coord1.latitude * Math.PI) / 180;
-    const lat2Rad = (coord2.latitude * Math.PI) / 180;
-    const latDiffRad = ((coord2.latitude - coord1.latitude) * Math.PI) / 180;
-    const lonDiffRad = ((coord2.longitude - coord1.longitude) * Math.PI) / 180;
-
-    const haversineA =
-      Math.sin(latDiffRad / 2) * Math.sin(latDiffRad / 2) +
-      Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(lonDiffRad / 2) * Math.sin(lonDiffRad / 2);
-    const haversineC = 2 * Math.atan2(Math.sqrt(haversineA), Math.sqrt(1 - haversineA));
-
-    return earthRadius * haversineC;
-  }
+  // Start background location tracking
+  const startBackgroundLocationTracking = async () => {
+    // Request background location permissions
+    const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
+    if (foregroundStatus !== 'granted') {
+      throw new Error('Permission to access location was denied');
+    }
+    
+    // For iOS, we need to request additional permissions for background tracking
+    if (Platform.OS === 'ios') {
+      const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+      if (backgroundStatus !== 'granted') {
+        throw new Error('Permission to access background location was denied');
+      }
+    }
+    
+    // Check if the task is already defined and running
+    const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
+      .catch(() => false);
+      
+    if (hasStarted) {
+      // Stop existing task before starting a new one
+      await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
+        .catch(error => console.warn('Failed to stop previous location task:', error));
+    }
+    
+    // Start the background task
+    await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+      accuracy: Location.Accuracy.High,
+      distanceInterval: 5, // minimum distance (in meters) between updates
+      timeInterval: 3000, // minimum time (in ms) between updates
+      foregroundService: {
+        notificationTitle: "DogDash is tracking your walk",
+        notificationBody: "Keep your phone with you to record your walk path accurately.",
+        notificationColor: "#34C759",
+      },
+      // This is crucial for background tracking on iOS
+      activityType: Location.ActivityType.Fitness,
+      showsBackgroundLocationIndicator: true,
+      // Make sure to specify we want background updates
+      pausesUpdatesAutomatically: false,
+    });
+  };
 
   // Start tracking a new walk
   async function startWalk() {
-    // Request location permissions
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      throw new Error('Permission to access location was denied');
-    }
-
-    // Create a new walk with a placeholder location first, so the UI can update immediately
-    const now = new Date();
-    const initialWalk: Walk = {
-      id: now.getTime().toString(),
-      date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
-      startTime: now.toISOString(),
-      endTime: '',
-      duration: 0,
-      distance: 0,
-      coordinates: [],
-    };
-
-    // Update the state immediately to show we're tracking
-    setCurrentWalk(initialWalk);
-    setIsTracking(true);
-
     try {
-      // Start a location subscription immediately with balanced accuracy
-      // This is just to show the user's location on the map while we wait for more accurate location
-      const initialSubscription = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.Balanced,
-          distanceInterval: 0, // Get all updates
-          timeInterval: 1000,  // Every second
-        },
-        (location) => {
-          // Only update the map with this location if we don't have any coordinates yet
-          setCurrentWalk((prevWalk) => {
-            if (!prevWalk || prevWalk.coordinates.length > 0) return prevWalk;
-            
-            // Don't calculate distance for this initial coordinate
-            // Just show user location on map until we get high accuracy
-            return {
-              ...prevWalk,
-              coordinates: [{
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-                timestamp: location.timestamp,
-              }],
-            };
-          });
-        }
-      );
+      // Create a new walk with initial location
+      const now = new Date();
+      const newWalk: Walk = {
+        id: now.getTime().toString(),
+        date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
+        startTime: now.toISOString(),
+        endTime: '',
+        duration: 0,
+        distance: 0,
+        coordinates: [],
+      };
 
-      // Simultaneously, try to get a high accuracy fix
-      // This won't block the UI but will give us a better starting point when available
-      Location.getCurrentPositionAsync({
+      // Update state right away for responsive UI
+      setCurrentWalk(newWalk);
+      setIsTracking(true);
+      
+      // Get initial high-accuracy location
+      const initialLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
-        // maximumAge: 0, // Want a fresh location
-      }).then((preciseLocation) => {
-        // Once we have precise location, remove initial subscription
-        initialSubscription.remove();
-        
-        // Add the precise location as the first real tracking point
-        setCurrentWalk((prevWalk) => {
+      }).catch(error => {
+        console.warn('Failed to get initial location:', error);
+        return null;
+      });
+      
+      // If we got an initial location, add it to the walk
+      if (initialLocation) {
+        setCurrentWalk(prevWalk => {
           if (!prevWalk) return null;
-          
-          const preciseCoordinate: Coordinate = {
-            latitude: preciseLocation.coords.latitude,
-            longitude: preciseLocation.coords.longitude,
-            timestamp: preciseLocation.timestamp,
-          };
           
           return {
             ...prevWalk,
-            // Replace any existing coordinates with just this precise one
-            coordinates: [preciseCoordinate],
+            coordinates: [{
+              latitude: initialLocation.coords.latitude,
+              longitude: initialLocation.coords.longitude,
+              timestamp: initialLocation.timestamp,
+            }],
           };
         });
-        
-        // Now start the regular high accuracy tracking
-        Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.High,
-            distanceInterval: 5, // update every 5 meters
-            timeInterval: 2500, // update every 2.5 seconds
-          },
-          (location) => {
-            setCurrentWalk((prevWalk) => {
-              if (!prevWalk) return null;
+      }
 
-              const newCoordinate: Coordinate = {
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-                timestamp: location.timestamp,
-              };
-
-              const updatedCoordinates = [...prevWalk.coordinates, newCoordinate];
-              let distance = prevWalk.distance;
-
-              // Calculate distance if we have at least 2 coordinates
-              if (updatedCoordinates.length > 1) {
-                const prevCoord = updatedCoordinates[updatedCoordinates.length - 2];
-                distance += calculateDistance(prevCoord, newCoordinate);
-              }
-
-              const now = new Date();
-              const startTime = new Date(prevWalk.startTime);
-              const duration = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-
-              return {
-                ...prevWalk,
-                coordinates: updatedCoordinates,
-                distance,
-                duration,
-              };
-            });
-          }
-        ).then(subscription => {
-          setLocationSubscription(subscription);
-        });
-      }).catch(error => {
-        console.warn('Failed to get high accuracy location:', error);
-        // Keep using the initial subscription if high accuracy fails
-        setLocationSubscription(initialSubscription);
-      });
+      // Start background location tracking
+      await startBackgroundLocationTracking();
       
     } catch (error) {
       console.error('Error starting walk:', error);
-      throw error; // Re-throw the error to be handled by the component
+      throw error;
     }
   }
 
   // Stop tracking the current walk
   async function stopWalk() {
-    if (locationSubscription) {
-      locationSubscription.remove();
-      setLocationSubscription(null);
-    }
+    try {
+      // Stop background location tracking
+      const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
+        .catch(() => false);
+        
+      if (hasStarted) {
+        await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+      }
+      
+      if (locationSubscription) {
+        locationSubscription.remove();
+        setLocationSubscription(null);
+      }
 
-    if (currentWalk) {
-      const now = new Date();
-      const completedWalk: Walk = {
-        ...currentWalk,
-        endTime: now.toISOString(),
-      };
+      if (currentWalk) {
+        const now = new Date();
+        const completedWalk: Walk = {
+          ...currentWalk,
+          endTime: now.toISOString(),
+        };
 
-      setWalks((prevWalks) => [...prevWalks, completedWalk]);
-      setCurrentWalk(null);
-      setIsTracking(false);
+        setWalks((prevWalks) => [...prevWalks, completedWalk]);
+        setCurrentWalk(null);
+        setIsTracking(false);
+        
+        // Clear the current walk from AsyncStorage
+        await AsyncStorage.removeItem('currentWalk');
+      }
+    } catch (error) {
+      console.error('Error stopping walk:', error);
+      throw error;
     }
   }
 
