@@ -4,7 +4,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { formatDate } from '@/utils/formatUtils';
+import { formatDate, getLocalDateString } from '@/utils/formatUtils';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import * as Haptics from 'expo-haptics';
@@ -31,7 +31,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   const handleDateChange = (event: any, newDate?: Date) => {
     setIsPickerVisible(Platform.OS === 'ios');
     if (newDate) {
-      const dateString = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}`;
+      // Use our utility function for consistent date formatting
+      const dateString = getLocalDateString(newDate);
       onDateChange(dateString);
     }
   };

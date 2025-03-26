@@ -7,6 +7,7 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { WalkCard } from '@/components/ui/WalkCard';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useWalk } from '@/contexts/WalkContext';
+import { getLocalDateString, debugDateInfo, parseLocalDateString, parseISOToLocalDate } from '@/utils/formatUtils';
 
 export default function HistoryScreen() {
   const { walks, getWalksByDate } = useWalk();
@@ -14,18 +15,24 @@ export default function HistoryScreen() {
   
   // Get all unique dates from walks
   const uniqueDates = [...new Set(walks.map(walk => walk.date))];
+
+  // Get today's date in YYYY-MM-DD format using local time
+  const todayFormatted = getLocalDateString();
   
-  // Get today's date in YYYY-MM-DD format
-  const now = new Date();
-  const todayFormatted = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  // Debug using current Date object
+  // debugDateInfo(new Date(), 'HistoryScreen-Today');
   
   // Add today's date to available dates if not already included
   if (!uniqueDates.includes(todayFormatted)) {
     uniqueDates.push(todayFormatted);
   }
   
-  // Sort dates in descending order (newest first)
-  uniqueDates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  // Sort dates in descending order (newest first) using our proper date parsing
+  uniqueDates.sort((a, b) => {
+    const dateA = parseLocalDateString(a);
+    const dateB = parseLocalDateString(b);
+    return dateB.getTime() - dateA.getTime();
+  });
   
   // Always default to today's date
   const [selectedDate, setSelectedDate] = useState(todayFormatted);
@@ -34,9 +41,11 @@ export default function HistoryScreen() {
   // Update walks when selected date changes
   useEffect(() => {
     const walksForSelectedDate = getWalksByDate(selectedDate);
+    
     // Sort walks for the selected date in reverse chronological order (newest first)
+    // Use parseISOToLocalDate for better time handling
     const sortedWalksForDate = [...walksForSelectedDate].sort(
-      (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+      (a, b) => parseISOToLocalDate(b.startTime).getTime() - parseISOToLocalDate(a.startTime).getTime()
     );
     setWalksForDate(sortedWalksForDate);
   }, [selectedDate, getWalksByDate, walks]);

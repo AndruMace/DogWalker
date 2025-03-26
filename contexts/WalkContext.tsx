@@ -2,10 +2,14 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import { Platform } from 'react-native';
+import { Platform, DeviceEventEmitter } from 'react-native';
+import { getLocalDateString, debugDateInfo } from '@/utils/formatUtils';
 
 // Define a background task name
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
+
+// Define event name for location updates
+const LOCATION_UPDATE_EVENT = 'location-update';
 
 // Define types for our walk data
 export type Coordinate = {
@@ -78,9 +82,11 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }: TaskMan
         const startTime = new Date(currentWalk.startTime);
         const duration = Math.floor((now.getTime() - startTime.getTime()) / 1000);
         
-        // Create updated walk
+        // Create updated walk - ensure date is using local time if needed
         const updatedWalk: Walk = {
           ...currentWalk,
+          // If date isn't set for some reason, set it using local time
+          date: currentWalk.date || getLocalDateString(now),
           coordinates: updatedCoordinates,
           distance,
           duration,
@@ -88,6 +94,9 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }: TaskMan
         
         // Save updated walk back to AsyncStorage
         await AsyncStorage.setItem('currentWalk', JSON.stringify(updatedWalk));
+        
+        // Emit event to update UI
+        DeviceEventEmitter.emit(LOCATION_UPDATE_EVENT, updatedWalk);
       } catch (error) {
         console.error('Error processing background location:', error);
       }
@@ -117,13 +126,53 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isTracking, setIsTracking] = useState(false);
   const [locationSubscription, setLocationSubscription] = useState<Location.LocationSubscription | null>(null);
 
+  // Listen for location updates
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      LOCATION_UPDATE_EVENT,
+      (updatedWalk: Walk) => {
+        setCurrentWalk(updatedWalk);
+      }
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   // Load walks from AsyncStorage on mount
   useEffect(() => {
     const loadWalks = async () => {
       try {
         const walksData = await AsyncStorage.getItem('walks');
         if (walksData) {
-          setWalks(JSON.parse(walksData));
+          const loadedWalks = JSON.parse(walksData);
+          
+          // Check if we need to fix dates in existing walks
+          const fixedWalks = loadedWalks.map((walk: Walk) => {
+            // Check if walk has an ISO startTime
+            if (walk.startTime) {
+              const walkDate = new Date(walk.startTime);
+              const correctDate = getLocalDateString(walkDate);
+              
+              // If dates don't match, update with correct local date
+              if (walk.date !== correctDate) {
+                return {
+                  ...walk,
+                  date: correctDate
+                };
+              }
+            }
+            return walk;
+          });
+          
+          // Only save back if we made changes
+          const needToSave = JSON.stringify(fixedWalks) !== walksData;
+          if (needToSave) {
+            await AsyncStorage.setItem('walks', JSON.stringify(fixedWalks));
+          }
+          
+          setWalks(fixedWalks);
         }
         
         // Check if there's an active walk in progress
@@ -217,8 +266,8 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Start the background task
     await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
       accuracy: Location.Accuracy.High,
-      distanceInterval: 5, // minimum distance (in meters) between updates
-      timeInterval: 3000, // minimum time (in ms) between updates
+      distanceInterval: 1, // minimum distance (in meters) between updates
+      timeInterval: 1000, // minimum time (in ms) between updates
       foregroundService: {
         notificationTitle: "DogDash is tracking your walk",
         notificationBody: "Keep your phone with you to record your walk path accurately.",
@@ -237,9 +286,15 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Create a new walk with initial location
       const now = new Date();
+      
+      // Debug date information to diagnose timezone issues
+      // debugDateInfo(now, 'startWalk');
+      
+      const formattedDate = getLocalDateString(now);
+      
       const newWalk: Walk = {
         id: now.getTime().toString(),
-        date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
+        date: formattedDate, // Use utility function for consistent local date formatting
         startTime: now.toISOString(),
         endTime: '',
         duration: 0,
@@ -302,11 +357,21 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (currentWalk) {
         const now = new Date();
+        // debugDateInfo(now, 'stopWalk');
+                
+        // Check if the walk spans midnight by comparing start date and current date
+        const walkDate = currentWalk.date;
+        const currentDate = getLocalDateString(now);
+        
+        if (walkDate !== currentDate) {
+          console.log(`Walk spans midnight! Started on ${walkDate}, ending on ${currentDate}`);
+        }
+        
         const completedWalk: Walk = {
           ...currentWalk,
           endTime: now.toISOString(),
         };
-
+        
         setWalks((prevWalks) => [...prevWalks, completedWalk]);
         setCurrentWalk(null);
         setIsTracking(false);

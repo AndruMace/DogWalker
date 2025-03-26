@@ -97,17 +97,6 @@ export const WalkMap: React.FC<WalkMapProps> = ({
         />
       )}
       
-      {hasDifferentStartAndEnd && (
-        <Marker
-          coordinate={{
-            latitude: endCoord.latitude,
-            longitude: endCoord.longitude,
-          }}
-          title="Current"
-          pinColor="red"
-        />
-      )}
-
       {/* Display custom markers with emojis */}
       {markers.map((marker) => (
         <Marker
