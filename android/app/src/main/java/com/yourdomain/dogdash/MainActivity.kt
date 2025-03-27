@@ -1,4 +1,4 @@
-package com.anonymous.DogWalker
+package com.yourdomain.dogdash
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
