@@ -150,6 +150,7 @@ export default function CurrentWalkScreen() {
               distance={currentWalk.distance}
               duration={currentWalk.duration}
               isLive={true}
+              isLoading={isLoading}
             />
           </ThemedView>
 

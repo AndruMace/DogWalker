@@ -40,69 +40,8 @@ type WalkContextType = {
 
 const WalkContext = createContext<WalkContextType | undefined>(undefined);
 
-// Register the background task outside of component
-TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }: TaskManager.TaskManagerTaskBody) => {
-  if (error) {
-    console.error('Error in background location task:', error);
-    return;
-  }
-  if (data) {
-    // Get the location data
-    const { locations } = data as { locations: Location.LocationObject[] };
-    if (locations && locations.length > 0) {
-      // Get the last location
-      const location = locations[locations.length - 1];
-      
-      try {
-        // Get the current walk from storage
-        const walkData = await AsyncStorage.getItem('currentWalk');
-        if (!walkData) return;
-        
-        const currentWalk: Walk = JSON.parse(walkData);
-        
-        // Create a new coordinate
-        const newCoordinate: Coordinate = {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          timestamp: location.timestamp,
-        };
-        
-        // Update walk with new coordinate
-        const updatedCoordinates = [...currentWalk.coordinates, newCoordinate];
-        let distance = currentWalk.distance;
-        
-        // Calculate distance if we have at least 2 coordinates
-        if (updatedCoordinates.length > 1) {
-          const prevCoord = updatedCoordinates[updatedCoordinates.length - 2];
-          const newDistance = calculateDistance(prevCoord, newCoordinate);
-          distance += newDistance;
-        }
-        
-        const now = new Date();
-        const startTime = new Date(currentWalk.startTime);
-        const duration = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-        
-        // Create updated walk - ensure date is using local time if needed
-        const updatedWalk: Walk = {
-          ...currentWalk,
-          // If date isn't set for some reason, set it using local time
-          date: currentWalk.date || getLocalDateString(now),
-          coordinates: updatedCoordinates,
-          distance,
-          duration,
-        };
-        
-        // Save updated walk back to AsyncStorage
-        await AsyncStorage.setItem('currentWalk', JSON.stringify(updatedWalk));
-        
-        // Emit event to update UI
-        DeviceEventEmitter.emit(LOCATION_UPDATE_EVENT, updatedWalk);
-      } catch (error) {
-        console.error('Error processing background location:', error);
-      }
-    }
-  }
-});
+// Note: The task is now defined at the app root level in _layout.tsx
+// This ensures it's available when the app starts
 
 // Calculate distance between two coordinates in meters using Haversine formula
 function calculateDistance(coord1: Coordinate, coord2: Coordinate): number {
@@ -125,6 +64,75 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentWalk, setCurrentWalk] = useState<Walk | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [locationSubscription, setLocationSubscription] = useState<Location.LocationSubscription | null>(null);
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
+
+  // Check and request location permissions on mount
+  useEffect(() => {
+    const checkAndRequestPermissions = async () => {
+      try {
+        console.log('Checking location permissions...');
+        
+        // Check current foreground permissions
+        const { status: foregroundStatus } = await Location.getForegroundPermissionsAsync();
+        console.log('Current foreground permission status:', foregroundStatus);
+        
+        let foregroundGranted = foregroundStatus === 'granted';
+        
+        // If not granted, request foreground permissions
+        if (!foregroundGranted) {
+          console.log('Requesting foreground permissions...');
+          const { status: newForegroundStatus } = await Location.requestForegroundPermissionsAsync();
+          console.log('New foreground permission status:', newForegroundStatus);
+          foregroundGranted = newForegroundStatus === 'granted';
+        }
+
+        if (!foregroundGranted) {
+          console.warn('Foreground location permission denied');
+          return;
+        }
+
+        let backgroundGranted = true;
+        
+        // For background tracking, we need different permissions on iOS and Android
+        if (Platform.OS === 'ios') {
+          const { status: backgroundStatus } = await Location.getBackgroundPermissionsAsync();
+          console.log('Current iOS background permission status:', backgroundStatus);
+          
+          if (backgroundStatus !== 'granted') {
+            console.log('Requesting iOS background permissions...');
+            const { status: newBackgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+            console.log('New iOS background permission status:', newBackgroundStatus);
+            backgroundGranted = newBackgroundStatus === 'granted';
+          }
+        } else if (Platform.OS === 'android') {
+          const apiLevel = Platform.Version;
+          if (apiLevel >= 29) {
+            const { status: backgroundStatus } = await Location.getBackgroundPermissionsAsync();
+            console.log('Current Android background permission status:', backgroundStatus);
+            
+            if (backgroundStatus !== 'granted') {
+              console.log('Requesting Android background permissions...');
+              const { status: newBackgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+              console.log('New Android background permission status:', newBackgroundStatus);
+              backgroundGranted = newBackgroundStatus === 'granted';
+            }
+          }
+        }
+
+        if (!backgroundGranted) {
+          console.warn('Background location permission denied');
+          // We'll still set permissions as granted for foreground tracking
+        }
+
+        console.log('Setting permissions as granted');
+        setPermissionsGranted(true);
+      } catch (error) {
+        console.error('Error checking/requesting permissions:', error);
+      }
+    };
+
+    checkAndRequestPermissions();
+  }, []);
 
   // Listen for location updates
   useEffect(() => {
@@ -237,76 +245,240 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
     saveCurrentWalk();
   }, [currentWalk]);
 
+  // Check if TaskManager is properly defined on mount
+  useEffect(() => {
+    const checkTaskDefinition = async () => {
+      // Check if task is defined
+      const isTaskDefined = TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK);
+      console.log('Is background location task defined:', isTaskDefined);
+      
+      if (!isTaskDefined) {
+        console.warn('Task is not defined properly. This may cause tracking issues.');
+      }
+    };
+    
+    checkTaskDefinition();
+  }, []);
+
   // Start background location tracking
   const startBackgroundLocationTracking = async () => {
-    // Request background location permissions
-    const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
-    if (foregroundStatus !== 'granted') {
-      throw new Error('Permission to access location was denied');
+    console.log('Starting background location tracking...');
+    
+    // Always define the task directly before starting it to ensure it's properly registered
+    if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
+      console.log('Task not defined, defining it now...');
+      TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }: TaskManager.TaskManagerTaskBody) => {
+        if (error) {
+          console.error('Error in background location task:', error);
+          return;
+        }
+        if (data) {
+          // Get the location data
+          const { locations } = data as { locations: Location.LocationObject[] };
+          console.log(`Received ${locations?.length || 0} location updates in task`);
+          
+          if (locations && locations.length > 0) {
+            // Get the last location
+            const location = locations[locations.length - 1];
+            console.log('New location in task:', {
+              lat: location.coords.latitude.toFixed(6),
+              lng: location.coords.longitude.toFixed(6),
+              accuracy: location.coords.accuracy?.toFixed(1) || 'unknown',
+              timestamp: new Date(location.timestamp).toLocaleTimeString(),
+            });
+            
+            try {
+              // Get the current walk from storage
+              const walkData = await AsyncStorage.getItem('currentWalk');
+              if (!walkData) {
+                console.warn('No current walk found in storage, ignoring update');
+                return;
+              }
+              
+              const currentWalk: Walk = JSON.parse(walkData);
+              console.log(`Current walk has ${currentWalk.coordinates.length} coordinates`);
+              
+              // Create a new coordinate
+              const newCoordinate: Coordinate = {
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+                timestamp: location.timestamp,
+              };
+              
+              // Update walk with new coordinate
+              const updatedCoordinates = [...currentWalk.coordinates, newCoordinate];
+              let distance = currentWalk.distance;
+              
+              // Calculate distance if we have at least 2 coordinates
+              if (updatedCoordinates.length > 1) {
+                const prevCoord = updatedCoordinates[updatedCoordinates.length - 2];
+                const newDistance = calculateDistance(prevCoord, newCoordinate);
+                console.log(`Added distance: ${newDistance.toFixed(2)} meters`);
+                distance += newDistance;
+              }
+              
+              const now = new Date();
+              const startTime = new Date(currentWalk.startTime);
+              const duration = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+              
+              // Create updated walk - ensure date is using local time if needed
+              const updatedWalk: Walk = {
+                ...currentWalk,
+                // If date isn't set for some reason, set it using local time
+                date: currentWalk.date || getLocalDateString(now),
+                coordinates: updatedCoordinates,
+                distance,
+                duration,
+              };
+              
+              console.log(`Updated walk in task: ${updatedWalk.coordinates.length} coords, ${updatedWalk.distance.toFixed(2)}m, ${updatedWalk.duration}s`);
+              
+              // Save updated walk back to AsyncStorage
+              await AsyncStorage.setItem('currentWalk', JSON.stringify(updatedWalk));
+              
+              // Emit event to update UI
+              DeviceEventEmitter.emit(LOCATION_UPDATE_EVENT, updatedWalk);
+            } catch (error) {
+              console.error('Error processing background location:', error);
+            }
+          } else {
+            console.warn('Received location update with no locations');
+          }
+        } else {
+          console.warn('Received data is null or undefined');
+        }
+      });
+      console.log('Task defined successfully');
+    } else {
+      console.log('Task already defined');
     }
     
-    // For iOS, we need to request additional permissions for background tracking
-    if (Platform.OS === 'ios') {
-      const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-      if (backgroundStatus !== 'granted') {
-        throw new Error('Permission to access background location was denied');
-      }
-    }
-    
-    // Check if the task is already defined and running
+    // Check if the task is already running
     const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
-      .catch(() => false);
+      .catch((error) => {
+        console.warn('Failed to check if location task is running:', error);
+        return false;
+      });
       
     if (hasStarted) {
       // Stop existing task before starting a new one
+      console.log('Stopping previous location task before restarting');
       await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
         .catch(error => console.warn('Failed to stop previous location task:', error));
     }
     
-    // Start the background task
-    await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+    // Configure the background task with platform-specific settings
+    const locationOptions: Location.LocationTaskOptions = {
       accuracy: Location.Accuracy.High,
       distanceInterval: 1, // minimum distance (in meters) between updates
       timeInterval: 1000, // minimum time (in ms) between updates
+      // Android-specific foreground service configuration
       foregroundService: {
         notificationTitle: "DogDash is tracking your walk",
         notificationBody: "Keep your phone with you to record your walk path accurately.",
         notificationColor: "#34C759",
       },
-      // This is crucial for background tracking on iOS
+      // iOS-specific configuration
       activityType: Location.ActivityType.Fitness,
       showsBackgroundLocationIndicator: true,
-      // Make sure to specify we want background updates
       pausesUpdatesAutomatically: false,
-    });
+      deferredUpdatesInterval: 1000, // Get updates at most every second
+      deferredUpdatesDistance: 1, // Get updates when moved at least 1 meter
+    };
+    
+    // Start the background task
+    console.log('Starting location updates task');
+    try {
+      await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, locationOptions);
+      console.log('Successfully started location updates task');
+      
+      // Also start foreground updates as a fallback
+      startForegroundLocationTracking();
+    } catch (error) {
+      console.error('Failed to start location updates task, falling back to foreground only:', error);
+      // Fall back to foreground tracking only
+      startForegroundLocationTracking();
+    }
+  };
+
+  // Start foreground location tracking as a fallback
+  const startForegroundLocationTracking = async () => {
+    const locationSubscription = await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.High,
+        distanceInterval: 1,
+        timeInterval: 1000,
+      },
+      async (location) => {
+        console.log('Received foreground location update');
+        try {
+          // Get the current walk from storage
+          const walkData = await AsyncStorage.getItem('currentWalk');
+          if (!walkData) return;
+          
+          const currentWalk: Walk = JSON.parse(walkData);
+          
+          // Create a new coordinate
+          const newCoordinate: Coordinate = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            timestamp: location.timestamp,
+          };
+          
+          // Update walk with new coordinate
+          const updatedCoordinates = [...currentWalk.coordinates, newCoordinate];
+          let distance = currentWalk.distance;
+          
+          // Calculate distance if we have at least 2 coordinates
+          if (updatedCoordinates.length > 1) {
+            const prevCoord = updatedCoordinates[updatedCoordinates.length - 2];
+            const newDistance = calculateDistance(prevCoord, newCoordinate);
+            distance += newDistance;
+          }
+          
+          const now = new Date();
+          const startTime = new Date(currentWalk.startTime);
+          const duration = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+          
+          // Create updated walk
+          const updatedWalk: Walk = {
+            ...currentWalk,
+            date: currentWalk.date || getLocalDateString(now),
+            coordinates: updatedCoordinates,
+            distance,
+            duration,
+          };
+          
+          // Save updated walk back to AsyncStorage
+          await AsyncStorage.setItem('currentWalk', JSON.stringify(updatedWalk));
+          
+          // Update UI
+          DeviceEventEmitter.emit(LOCATION_UPDATE_EVENT, updatedWalk);
+        } catch (error) {
+          console.error('Error processing foreground location:', error);
+        }
+      }
+    );
+    
+    // Remember the subscription so we can clean it up later
+    setLocationSubscription(locationSubscription);
   };
 
   // Start tracking a new walk
   async function startWalk() {
     try {
-      // Create a new walk with initial location
-      const now = new Date();
+      console.log('Starting walk, permissions granted:', permissionsGranted);
       
-      // Debug date information to diagnose timezone issues
-      // debugDateInfo(now, 'startWalk');
+      // Double check permissions before starting
+      const { status: foregroundStatus } = await Location.getForegroundPermissionsAsync();
+      console.log('Current foreground permission status:', foregroundStatus);
       
-      const formattedDate = getLocalDateString(now);
-      
-      const newWalk: Walk = {
-        id: now.getTime().toString(),
-        date: formattedDate, // Use utility function for consistent local date formatting
-        startTime: now.toISOString(),
-        endTime: '',
-        duration: 0,
-        distance: 0,
-        coordinates: [],
-      };
+      if (foregroundStatus !== 'granted') {
+        throw new Error('Location permissions not granted. Please enable location services in your device settings.');
+      }
 
-      // Update state right away for responsive UI
-      setCurrentWalk(newWalk);
-      setIsTracking(true);
-      
       // Get initial high-accuracy location
+      console.log('Getting initial location...');
       const initialLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       }).catch(error => {
@@ -314,27 +486,52 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
       });
       
-      // If we got an initial location, add it to the walk
-      if (initialLocation) {
-        setCurrentWalk(prevWalk => {
-          if (!prevWalk) return null;
-          
-          return {
-            ...prevWalk,
-            coordinates: [{
-              latitude: initialLocation.coords.latitude,
-              longitude: initialLocation.coords.longitude,
-              timestamp: initialLocation.timestamp,
-            }],
-          };
-        });
+      // If we couldn't get an initial location, throw an error
+      if (!initialLocation) {
+        throw new Error('Unable to get initial location. Please ensure location services are enabled and try again.');
       }
+
+      // Create a new walk with initial location
+      const now = new Date();
+      const formattedDate = getLocalDateString(now);
+      
+      const newWalk: Walk = {
+        id: now.getTime().toString(),
+        date: formattedDate,
+        startTime: now.toISOString(),
+        endTime: '',
+        duration: 0,
+        distance: 0,
+        coordinates: [{
+          latitude: initialLocation.coords.latitude,
+          longitude: initialLocation.coords.longitude,
+          timestamp: initialLocation.timestamp,
+        }],
+      };
+
+      console.log('Created new walk with initial location:', {
+        lat: initialLocation.coords.latitude.toFixed(6),
+        lng: initialLocation.coords.longitude.toFixed(6)
+      });
+
+      // Update state right away for responsive UI
+      setCurrentWalk(newWalk);
+      setIsTracking(true);
+
+      // Save walk to AsyncStorage before starting background tracking
+      await AsyncStorage.setItem('currentWalk', JSON.stringify(newWalk));
 
       // Start background location tracking
       await startBackgroundLocationTracking();
       
+      console.log('Walk started successfully');
+      
     } catch (error) {
       console.error('Error starting walk:', error);
+      // Reset state if walk failed to start
+      setCurrentWalk(null);
+      setIsTracking(false);
+      await AsyncStorage.removeItem('currentWalk').catch(() => {});
       throw error;
     }
   }
@@ -342,22 +539,33 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Stop tracking the current walk
   async function stopWalk() {
     try {
+      console.log('Stopping walk...');
+      
       // Stop background location tracking
       const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
         .catch(() => false);
         
       if (hasStarted) {
-        await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+        console.log('Stopping location updates task');
+        await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
+          .catch(error => {
+            console.warn('Failed to stop location updates:', error);
+          });
+      } else {
+        console.log('No active location updates task to stop');
       }
       
+      // Stop foreground location tracking
       if (locationSubscription) {
+        console.log('Removing foreground location subscription');
         locationSubscription.remove();
         setLocationSubscription(null);
+      } else {
+        console.log('No foreground location subscription to remove');
       }
 
       if (currentWalk) {
         const now = new Date();
-        // debugDateInfo(now, 'stopWalk');
                 
         // Check if the walk spans midnight by comparing start date and current date
         const walkDate = currentWalk.date;
@@ -372,12 +580,28 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
           endTime: now.toISOString(),
         };
         
-        setWalks((prevWalks) => [...prevWalks, completedWalk]);
+        console.log(`Completed walk: ${completedWalk.coordinates.length} coords, ${completedWalk.distance.toFixed(2)}m, ${completedWalk.duration}s`);
+        
+        // Make a copy of walks and add the new one
+        const updatedWalks = [...walks, completedWalk];
+        setWalks(updatedWalks);
+        
+        // Also save walks to AsyncStorage directly to ensure it's saved
+        try {
+          await AsyncStorage.setItem('walks', JSON.stringify(updatedWalks));
+        } catch (error) {
+          console.error('Error saving walks to AsyncStorage:', error);
+        }
+        
+        // Clear the current walk
         setCurrentWalk(null);
         setIsTracking(false);
         
         // Clear the current walk from AsyncStorage
         await AsyncStorage.removeItem('currentWalk');
+        console.log('Walk stopped and saved successfully');
+      } else {
+        console.warn('No current walk to stop');
       }
     } catch (error) {
       console.error('Error stopping walk:', error);

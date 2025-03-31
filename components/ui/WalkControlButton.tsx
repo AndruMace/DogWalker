@@ -1,15 +1,13 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, ActivityIndicator, ViewStyle } from 'react-native';
+import { StyleSheet, TouchableOpacity, ActivityIndicator, View } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
 
 type WalkControlButtonProps = {
   type: 'start' | 'stop';
   onPress: () => void;
   isLoading?: boolean;
-  style?: ViewStyle;
+  style?: any;
 };
 
 export const WalkControlButton: React.FC<WalkControlButtonProps> = ({
@@ -18,59 +16,80 @@ export const WalkControlButton: React.FC<WalkControlButtonProps> = ({
   isLoading = false,
   style,
 }) => {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
-  const buttonColor = type === 'start' ? '#34C759' : '#FF3B30'; // Green for start, red for stop
-  const buttonText = type === 'start' ? 'Start Walk' : 'End Walk';
-  const iconName = type === 'start' ? 'play.fill' : 'stop.fill';
+  const isStart = type === 'start';
 
   return (
     <TouchableOpacity
-      style={[
-        styles.button,
-        { backgroundColor: buttonColor },
-        style,
-      ]}
       onPress={onPress}
       disabled={isLoading}
-      activeOpacity={0.8}
-      testID={`walk-control-button-${type}`}
-    >
-      {isLoading ? (
-        <ActivityIndicator color="white" size="small" />
-      ) : (
-        <>
-          <IconSymbol name={iconName} size={20} color="white" />
-          <ThemedText
-            style={{
-              color: 'white',
-              fontSize: 16,
-              fontWeight: 'bold',
-            }}
-          >
-            {buttonText}
-          </ThemedText>
-        </>
-      )}
+      activeOpacity={0.7}
+      style={[
+        styles.button,
+        isStart ? styles.startButton : styles.stopButton,
+        isLoading && styles.disabledButton,
+        style,
+      ]}>
+      <View style={styles.content}>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator color="white" />
+            <ThemedText style={styles.loadingText}>
+              {isStart ? 'Starting Walk...' : 'Stopping Walk...'}
+            </ThemedText>
+          </View>
+        ) : (
+          <>
+            <IconSymbol
+              name={isStart ? 'play.circle.fill' : 'stop.circle.fill'}
+              size={24}
+              color="white"
+            />
+            <ThemedText style={styles.text}>
+              {isStart ? 'Start Walk' : 'End Walk'}
+            </ThemedText>
+          </>
+        )}
+      </View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   button: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
+    borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 25,
-    marginBottom: 32,
+    minWidth: 160,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startButton: {
+    backgroundColor: '#34C759',
+  },
+  stopButton: {
+    backgroundColor: '#FF3B30',
+  },
+  disabledButton: {
+    opacity: 0.7,
+  },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  },
+  text: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
   },
 }); 

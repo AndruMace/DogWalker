@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, Dimensions, View, Text } from 'react-native';
-import MapView, { Marker, Region } from 'react-native-maps';
+import { StyleSheet, Dimensions, View, Text, Platform } from 'react-native';
+import MapView, { Marker, Region, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Coordinate } from '@/contexts/WalkContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import CustomPolyline from './CustomPolyline';
@@ -65,9 +65,13 @@ export const WalkMap: React.FC<WalkMapProps> = ({
     (startCoord.latitude !== endCoord.latitude || 
      startCoord.longitude !== endCoord.longitude);
 
+  // Select the appropriate map provider based on platform
+  const mapProvider = Platform.OS === 'ios' ? PROVIDER_DEFAULT : PROVIDER_GOOGLE;
+
   return (
     <MapView
       style={styles.map}
+      provider={mapProvider}
       initialRegion={initialRegion}
       showsUserLocation={showsUserLocation}
       followsUserLocation={followsUserLocation}

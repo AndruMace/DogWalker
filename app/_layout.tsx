@@ -44,20 +44,18 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-  // We'll ignore the system color scheme and always use light mode
-  // const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme();
 
   return (
-    <WalkProvider>
-      <MarkerProvider>
-        <ThemeProvider value={DefaultTheme}>
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <WalkProvider>
+        <MarkerProvider>
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" />
+            <Stack.Screen name="walk-details" options={{ headerShown: false }} />
           </Stack>
-          <StatusBar style="light" />
-        </ThemeProvider>
-      </MarkerProvider>
-    </WalkProvider>
+        </MarkerProvider>
+      </WalkProvider>
+    </ThemeProvider>
   );
 }

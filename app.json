@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourdomain.dogdash",
+      "bundleIdentifier": "com.anonymous.dogdash",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to track your walks with your dog.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to track your walks with your dog even when the app is in the background.",
@@ -18,13 +18,17 @@
         "UIBackgroundModes": [
           "location",
           "fetch",
+          "processing",
+          "location",
+          "fetch",
           "processing"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
@@ -37,7 +41,7 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.WAKE_LOCK"
       ],
-      "package": "com.yourdomain.dogdash"
+      "package": "com.anonymous.dogdash"
     },
     "web": {
       "bundler": "metro",
@@ -66,6 +70,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "41b488b9-216a-4031-ad4c-e6046170d084"
+      }
     }
   }
 }

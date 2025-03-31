@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -13,6 +13,7 @@ type WalkStatsCardProps = {
   distance: number; // meters
   duration: number; // seconds
   isLive?: boolean;
+  isLoading?: boolean;
 };
 
 export const WalkStatsCard: React.FC<WalkStatsCardProps> = ({
@@ -20,6 +21,7 @@ export const WalkStatsCard: React.FC<WalkStatsCardProps> = ({
   distance,
   duration,
   isLive = false,
+  isLoading = false,
 }) => {
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -38,11 +40,25 @@ export const WalkStatsCard: React.FC<WalkStatsCardProps> = ({
     <ThemedView style={[styles.container, isLive && styles.liveContainer]}>
       <View style={styles.statItem}>
         <IconSymbol name="figure.walk" size={24} color={accentColor} />
-        <ThemedText type="subtitle">{formatDistance(distance)}</ThemedText>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={accentColor} />
+            <ThemedText type="subtitle">Initializing...</ThemedText>
+          </View>
+        ) : (
+          <ThemedText type="subtitle">{formatDistance(distance)}</ThemedText>
+        )}
       </View>
       <View style={styles.statItem}>
         <IconSymbol name="clock.fill" size={24} color={accentColor} />
-        <ThemedText type="subtitle">{formatDuration(duration)}</ThemedText>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={accentColor} />
+            <ThemedText type="subtitle">Initializing...</ThemedText>
+          </View>
+        ) : (
+          <ThemedText type="subtitle">{formatDuration(duration)}</ThemedText>
+        )}
       </View>
       {isLive && (
         <View style={styles.liveIndicator}>
@@ -74,17 +90,21 @@ export const WalkStatsCard: React.FC<WalkStatsCardProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 16,
     borderRadius: 12,
-    marginVertical: 8,
+    gap: 16,
   },
   liveContainer: {
-    borderWidth: 2,
-    borderColor: '#FF3B30',
+    backgroundColor: '#34C75920',
   },
   statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -93,17 +113,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: '#34C759',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   liveDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#FF3B30',
+    backgroundColor: 'white',
   },
   arrowContainer: {
-    position: 'absolute',
-    right: 16,
-    top: '50%',
-    transform: [{ translateY: -10 }],
+    marginLeft: 'auto',
   },
 }); 
