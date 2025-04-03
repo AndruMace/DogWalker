@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "DogDash",
-    "slug": "DogDash",
+    "jsEngine": "hermes",
+    "name": "PawPath",
+    "slug": "PawPath",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -10,7 +11,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.dogdash",
+      "bundleIdentifier": "com.andrumace.pawpath",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to track your walks with your dog.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to track your walks with your dog even when the app is in the background.",
@@ -23,7 +24,8 @@
           "fetch",
           "processing"
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "BGTaskSchedulerPermittedIdentifiers": ["com.andrumace.pawpath.background-location-task"]
       }
     },
     "android": {
@@ -41,7 +43,7 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.WAKE_LOCK"
       ],
-      "package": "com.anonymous.dogdash"
+      "package": "com.andrumace.PawPath"
     },
     "web": {
       "bundler": "metro",
@@ -81,3 +83,4 @@
     }
   }
 }
+ 

@@ -374,7 +374,7 @@ export const WalkProvider: React.FC<{ children: React.ReactNode }> = ({ children
       timeInterval: 1000, // minimum time (in ms) between updates
       // Android-specific foreground service configuration
       foregroundService: {
-        notificationTitle: "DogDash is tracking your walk",
+        notificationTitle: "TailTrails is tracking your walk",
         notificationBody: "Keep your phone with you to record your walk path accurately.",
         notificationColor: "#34C759",
       },

@@ -1,4 +1,4 @@
-appId: com.anonymous.DogWalker
+appId: com.andrumace.PawPath
 ---
 - launchApp
 - tapOn:

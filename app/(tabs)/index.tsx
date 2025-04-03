@@ -44,7 +44,7 @@ export default function HomeScreen() {
           style={styles.headerImage}
           resizeMode="contain"
         />
-        <ThemedText type="title">DogDash</ThemedText>
+        <ThemedText type="title">PawPath</ThemedText>
         <ThemedText type="subtitle">Track your walks with your furry friend</ThemedText>
       </View>
 
