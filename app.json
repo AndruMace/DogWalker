@@ -25,7 +25,9 @@
           "processing"
         ],
         "ITSAppUsesNonExemptEncryption": false,
-        "BGTaskSchedulerPermittedIdentifiers": ["com.andrumace.pawpath.background-location-task"]
+        "BGTaskSchedulerPermittedIdentifiers": [
+          "com.andrumace.pawpath.background-location-task"
+        ]
       }
     },
     "android": {
@@ -78,9 +80,8 @@
         "origin": false
       },
       "eas": {
-        "projectId": "41b488b9-216a-4031-ad4c-e6046170d084"
+        "projectId": "c480bf6c-ac07-4fef-9e62-d0b8cff93b09"
       }
     }
   }
 }
- 
