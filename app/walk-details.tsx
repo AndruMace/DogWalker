@@ -70,7 +70,7 @@ export default function WalkDetailScreen() {
           onPress: async () => {
             if (walk) {
               await deleteWalk(walk.id);
-              router.back();
+              router.push('/(tabs)/history');
             }
           },
         },
@@ -78,15 +78,30 @@ export default function WalkDetailScreen() {
     );
   };
 
+  // Navigate back to history
+  const handleBackToHistory = () => {
+    router.push('/(tabs)/history');
+  };
+
   // If walk not found
   if (!walk) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Walk Details', headerBackTitle: 'Back' }} />
+        <Stack.Screen options={{ 
+          title: 'Walk Details',
+          headerShown: true,
+        }} />
         <ThemedView style={styles.notFoundContainer}>
           <IconSymbol name="exclamationmark.triangle" size={64} color="#FF9500" />
           <ThemedText type="subtitle">Walk Not Found</ThemedText>
           <ThemedText>This walk may have been deleted or doesn't exist.</ThemedText>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={handleBackToHistory}
+          >
+            <IconSymbol name="arrow.left" size={20} color="#FFFFFF" />
+            <ThemedText style={styles.backButtonText}>Back to History</ThemedText>
+          </TouchableOpacity>
         </ThemedView>
       </>
     );
@@ -97,16 +112,28 @@ export default function WalkDetailScreen() {
       <Stack.Screen 
         options={{
           title: 'Walk Details',
-          headerBackTitle: 'Back',
+          headerLeft: () => (
+            <TouchableOpacity 
+              onPress={handleBackToHistory}
+              style={styles.headerButton}
+            >
+              <IconSymbol name="chevron.backward" size={22} color={accentColor} />
+            </TouchableOpacity>
+          ),
           headerRight: () => (
-            <TouchableOpacity onPress={handleDelete} style={styles.deleteIcon}>
+            <TouchableOpacity 
+              onPress={handleDelete} 
+              style={styles.headerButton}
+            >
               <IconSymbol
                 name="trash"
-                size={24}
+                size={22}
                 color={Platform.OS === 'ios' ? accentColor : '#FF3B30'}
               />
             </TouchableOpacity>
           ),
+          headerShown: true,
+          headerBackVisible: false,
         }}
       />
       <ScrollView style={styles.container}>
@@ -181,6 +208,11 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
+  headerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
   deleteIcon: {
     padding: 8,
   },
@@ -224,5 +256,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     gap: 16,
+  },
+  backButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    gap: 8,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
 }); 
