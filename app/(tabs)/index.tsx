@@ -22,15 +22,10 @@ export default function HomeScreen() {
   // Handle start walk button press
   const handleStartWalk = async () => {
     try {
-      // Navigate first, then start the walk in the background
       router.push('/current-walk');
-      
-      // Start the walk asynchronously after navigation
-      setTimeout(() => {
-        startWalk().catch(error => {
-          console.error('Error starting walk:', error);
-        });
-      }, 100);
+      startWalk().catch(error => {
+        console.error('Error starting walk:', error);
+      });
     } catch (error) {
       console.error('Error navigating to current walk:', error);
     }

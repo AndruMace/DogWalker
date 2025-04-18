@@ -7,7 +7,7 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { WalkCard } from '@/components/ui/WalkCard';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useWalk } from '@/contexts/WalkContext';
-import { getLocalDateString, debugDateInfo, parseLocalDateString, parseISOToLocalDate } from '@/utils/formatUtils';
+import { getLocalDateString, parseLocalDateString, parseISOToLocalDate } from '@/utils/formatUtils';
 
 export default function HistoryScreen() {
   const { walks, getWalksByDate } = useWalk();
@@ -18,9 +18,6 @@ export default function HistoryScreen() {
 
   // Get today's date in YYYY-MM-DD format using local time
   const todayFormatted = getLocalDateString();
-  
-  // Debug using current Date object
-  // debugDateInfo(new Date(), 'HistoryScreen-Today');
   
   // Add today's date to available dates if not already included
   if (!uniqueDates.includes(todayFormatted)) {
