@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, SafeAreaView, Platform, StatusBar, BackHandler, Dimensions, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, SafeAreaView, Platform, StatusBar, BackHandler, Dimensions, Alert, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 
@@ -143,66 +143,70 @@ export default function CurrentWalkScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {isTracking && currentWalk ? (
-        <View style={styles.activeWalkContainer}>
-          <ThemedView style={styles.headerContainer}>
-            <ThemedText type="title">Current Walk</ThemedText>
-            <WalkStatsCard
-              distance={currentWalk.distance}
-              duration={currentWalk.duration}
-              isLive={true}
-              isLoading={isLoading}
-            />
-          </ThemedView>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.activeWalkContainer}
+        >
+          <View style={styles.contentContainer}>
+            <ThemedView style={styles.headerContainer}>
+              <ThemedText type="title">Current Walk</ThemedText>
+              <WalkStatsCard
+                distance={currentWalk.distance}
+                duration={currentWalk.duration}
+                isLive={true}
+                isLoading={isLoading}
+              />
+            </ThemedView>
 
-          <View style={styles.mapContainer}>
-            {currentWalk.coordinates && currentWalk.coordinates.length > 0 ? (
-              <>
-                <WalkMap
-                  coordinates={currentWalk.coordinates}
-                  markers={markers}
-                  followsUserLocation={true}
-                  showsUserLocation={true}
-                  onPress={handleMapPress}
-                />
-                
-                {/* Marker button */}
-                <TouchableOpacity
-                  style={[
-                    styles.markerToggleButton,
-                    showMarkerControls && styles.markerToggleButtonActive
-                  ]}
-                  onPress={toggleMarkerControls}
-                >
-                  <IconSymbol name="mappin.circle.fill" size={24} color="white" />
-                </TouchableOpacity>
-                
-                {/* Marker controls */}
-                {showMarkerControls && (
-                  <MarkerControls
-                    selectedMarkerType={selectedMarkerType}
-                    onSelectMarker={handleSelectMarkerType}
+            <View style={styles.mapContainer}>
+              {currentWalk.coordinates && currentWalk.coordinates.length > 0 ? (
+                <>
+                  <WalkMap
+                    coordinates={currentWalk.coordinates}
+                    markers={markers}
+                    followsUserLocation={true}
+                    showsUserLocation={true}
+                    onPress={handleMapPress}
                   />
-                )}
-              </>
-            ) : (
-              <ThemedView style={styles.acquiringLocationContainer}>
-                <ActivityIndicator size="large" color="#34C759" />
-                <ThemedText style={styles.acquiringText}>Acquiring precise location...</ThemedText>
-                <ThemedText style={styles.acquiringSubtext}>
-                  Getting an accurate location fix for the start of your walk. This helps ensure accurate distance tracking.
-                </ThemedText>
-              </ThemedView>
-            )}
+                  
+                  {/* Marker button */}
+                  <TouchableOpacity
+                    style={[
+                      styles.markerToggleButton,
+                      showMarkerControls && styles.markerToggleButtonActive
+                    ]}
+                    onPress={toggleMarkerControls}
+                  >
+                    <IconSymbol name="mappin.circle.fill" size={24} color="white" />
+                  </TouchableOpacity>
+                  
+                  {/* Marker controls */}
+                  {showMarkerControls && (
+                    <MarkerControls
+                      selectedMarkerType={selectedMarkerType}
+                      onSelectMarker={handleSelectMarkerType}
+                    />
+                  )}
+                </>
+              ) : (
+                <ThemedView style={styles.acquiringLocationContainer}>
+                  <ActivityIndicator size="large" color="#34C759" />
+                  <ThemedText style={styles.acquiringText}>Acquiring precise location...</ThemedText>
+                  <ThemedText style={styles.acquiringSubtext}>
+                    Getting an accurate location fix for the start of your walk. This helps ensure accurate distance tracking.
+                  </ThemedText>
+                </ThemedView>
+              )}
+            </View>
+            <View style={styles.buttonContainer}>
+              <WalkControlButton
+                type="stop"
+                onPress={handleStopWalk}
+                isLoading={isLoading}
+              />
+            </View>
           </View>
-
-          <View style={styles.buttonContainer}>
-            <WalkControlButton
-              type="stop"
-              onPress={handleStopWalk}
-              isLoading={isLoading}
-            />
-          </View>
-        </View>
+        </KeyboardAvoidingView>
       ) : (
         <ThemedView style={styles.emptyStateContainer}>
           <IconSymbol name="figure.walk" size={64} color="#34C759" />
@@ -231,7 +235,11 @@ const styles = StyleSheet.create({
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'space-between',
+    // justifyContent: 'flex-start',
+  },
+  contentContainer: {
+    flex: 1,
+    paddingBottom: 80,
   },
   headerContainer: {
     padding: 16,
@@ -239,14 +247,17 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     flex: 1,
-    maxHeight: screenHeight * 0.5, // Limit map height to 50% of screen
-    marginBottom: 8,
+    position: 'relative',
+    maxHeight: screenHeight * 0.5,
+    marginHorizontal: 8,
   },
   buttonContainer: {
-    padding: 16,
+    display: 'flex',
     alignItems: 'center',
-    marginTop: 'auto',
-    marginBottom: 8,
+    justifyContent: 'flex-start',
+    paddingVertical: 64,
+    backgroundColor: 'transparent',
+    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
   },
   emptyStateContainer: {
     flex: 1,
