@@ -13,9 +13,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.andrumace.pawpath",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "We need your location to track your walks with your dog.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to track your walks with your dog even when the app is in the background.",
-        "NSLocationAlwaysUsageDescription": "We need your location to track your walks with your dog even when the app is in the background.",
+        "NSLocationWhenInUseUsageDescription": "We need your location to track your walks with your dog while the app is in use and store a history of your walks for you to view later.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "If you'd like to let us track your walks and store a history of them and use your phone for other purposes or turn your screen off while walking, then we need to track your location even when the app is in the background.",
+        "NSLocationAlwaysUsageDescription": "If you'd like to let us track your walks and store a history of them and use your phone for other purposes or turn your screen off while walking, then we need to track your location even when the app is in the background.",
         "UIBackgroundModes": [
           "location",
           "fetch",
